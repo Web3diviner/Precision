@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: precision-farming-api
+    runtime: node
+    buildCommand: npm ci && npm run build --workspace=@precision/api
+    startCommand: node services/api/dist/index.js
+    healthCheckPath: /health
+    autoDeploy: false
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: COMMAND_EXPIRY_SECONDS
+        value: "120"
+      - key: CONTROLLER_OFFLINE_SECONDS
+        value: "180"
+      - key: MAX_IRRIGATION_LITERS
+        value: "20"

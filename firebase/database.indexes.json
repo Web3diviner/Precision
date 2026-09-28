@@ -1,0 +1,1 @@
+{"rules":{"farms":{"$farmId":{"alerts":{".indexOn":["created_at"]},"stands":{"$standId":{"nodes":{"$nodeId":{"logs":{".indexOn":["measured_at"]}}},"operations":{".indexOn":["created_at"]}}}}}}}

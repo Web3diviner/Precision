@@ -1,0 +1,22 @@
+{
+  "name": "precision-farming",
+  "private": true,
+  "packageManager": "npm@10.9.2",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm run dev --workspace=@precision/web",
+    "dev:api": "npm run dev --workspace=@precision/api",
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "tsx --test packages/contracts/src/index.test.ts tests/firebase-artifacts.test.ts"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "^5.0.2",
+    "@next/swc-win32-x64-msvc": "^15.5.26",
+    "firebase-tools": "^15.31.0"
+  }
+}

@@ -1,0 +1,7 @@
+firmware/secrets.h
+node_modules/
+.next/
+.npm-cache/
+.env
+.env.local
+dist/

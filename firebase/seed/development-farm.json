@@ -1,0 +1,21 @@
+{
+  "farms": {
+    "FARM_001": {
+      "metadata": {"name": "Development farm", "timezone": "Africa/Lagos", "active": true},
+      "stands": {
+        "STAND_01": {
+          "metadata": {"stand_id": "STAND_01", "name": "Stand 01", "node_count": 6, "active": true},
+          "controller": {"online": false, "last_seen": 0, "firmware_version": "TBC", "firebase_connected": false, "sd_ready": false},
+          "nodes": {
+            "NODE_01": {"metadata": {"node_id": "NODE_01", "position": 1, "sensor_type": "CWT_7_IN_1", "modbus_address": 1, "enabled": true}},
+            "NODE_02": {"metadata": {"node_id": "NODE_02", "position": 2, "sensor_type": "CWT_7_IN_1", "modbus_address": 2, "enabled": true}},
+            "NODE_03": {"metadata": {"node_id": "NODE_03", "position": 3, "sensor_type": "CWT_7_IN_1", "modbus_address": 3, "enabled": true}},
+            "NODE_04": {"metadata": {"node_id": "NODE_04", "position": 4, "sensor_type": "CWT_7_IN_1", "modbus_address": 4, "enabled": true}},
+            "NODE_05": {"metadata": {"node_id": "NODE_05", "position": 5, "sensor_type": "CWT_7_IN_1", "modbus_address": 5, "enabled": true}},
+            "NODE_06": {"metadata": {"node_id": "NODE_06", "position": 6, "sensor_type": "CWT_7_IN_1", "modbus_address": 6, "enabled": true}}
+          }
+        }
+      }
+    }
+  }
+}
