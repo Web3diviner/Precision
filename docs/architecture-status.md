@@ -33,6 +33,7 @@
 - Retired root Firebase rule/config artifacts fail closed; `firebase.json` is the sole active Firebase deployment declaration.
 - GitHub Actions verifies clean dependency installation, workspace type checks, contract/security tests, and production builds on pull requests and `main`.
 - Firebase Emulator UI is assigned port `4001` to avoid the local API on port `4000`; the Render blueprint is configured for automatic deployment.
+- Core runtime packages are current on Next.js 16, Firebase Web 12, and Firebase Admin 14; the web production build, API build, contract/security tests, and type checks pass on that upgraded stack.
 
 ## Deliberately not marked production-ready
 
@@ -41,3 +42,4 @@
 - Firebase Emulator rules/API tests and hardware bench validation are the next application milestones.
 - Alert consumption and acknowledgement are implemented; controller-detected command failures generate immutable system alerts. Automated agronomic thresholds and outbound notifications still need a dedicated evaluation service.
 - N/P/K engineering units remain TBC until the exact probe datasheet is verified.
+- Registry audit still reports two moderate transitive `uuid` findings in the Google Admin client chain; npm did not provide a safe automatic remediation.
