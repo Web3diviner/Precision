@@ -5,9 +5,10 @@ import test from "node:test";
 const json = (file: string) => JSON.parse(readFileSync(file, "utf8")) as Record<string, unknown>;
 
 test("Firebase deploy manifest selects the active farm-scoped rules and indexes", () => {
-  const config = json("firebase.json") as { database?: { rules?: string; indexes?: string } };
+  const config = json("firebase.json") as { database?: { rules?: string; indexes?: string }; emulators?: { ui?: { port?: number } } };
   assert.equal(config.database?.rules, "firebase/database.rules.json");
   assert.equal(config.database?.indexes, "firebase/database.indexes.json");
+  assert.equal(config.emulators?.ui?.port, 4001, "Firebase Emulator UI must not collide with the local API on port 4000");
 });
 
 test("retired root rules files fail closed", () => {
@@ -16,6 +17,26 @@ test("retired root rules files fail closed", () => {
     assert.equal(rules.rules?.[".read"], false, `${file} must not grant reads`);
     assert.equal(rules.rules?.[".write"], false, `${file} must not grant writes`);
   }
+});
+
+test("local web API fallbacks match the API service port", () => {
+  const api = readFileSync("services/api/src/index.ts", "utf8");
+  const dashboard = readFileSync("apps/web/components/dashboard.tsx", "utf8");
+  const operationForm = readFileSync("apps/web/components/operation-form.tsx", "utf8");
+  assert.match(api, /process\.env\.PORT \?\? 4000/);
+  assert.match(dashboard, /http:\/\/localhost:4000/);
+  assert.match(operationForm, /http:\/\/localhost:4000/);
+});
+
+test("development seed contains one offline six-node stand with unique Modbus addresses", () => {
+  const seed = json("firebase/seed/development-farm.json") as { farms: Record<string, { stands: Record<string, { controller: { online?: boolean }; nodes: Record<string, { metadata?: { enabled?: boolean; modbus_address?: number } }> }> }> };
+  const stand = seed.farms.FARM_001.stands.STAND_01;
+  assert.equal(stand.controller.online, false);
+  const nodeIds = Object.keys(stand.nodes).sort();
+  assert.deepEqual(nodeIds, ["NODE_01", "NODE_02", "NODE_03", "NODE_04", "NODE_05", "NODE_06"]);
+  const addresses = nodeIds.map((nodeId) => stand.nodes[nodeId].metadata?.modbus_address).sort((a, b) => (a ?? 0) - (b ?? 0));
+  assert.deepEqual(addresses, [1, 2, 3, 4, 5, 6]);
+  assert.ok(nodeIds.every((nodeId) => stand.nodes[nodeId].metadata?.enabled === true));
 });
 
 test("active controller write paths require an enabled device registry entry", () => {
@@ -36,6 +57,29 @@ test("authorized users can subscribe to the Node collection without command-queu
   assert.match(String(nodes[".read"]), /farm_ids/);
   assert.match(String(commands[".read"]), /child\('enabled'\)\.val\(\) === true/);
   assert.equal((commands.$commandId as Record<string, unknown>)[".write"], false);
+});
+
+test("an enabled controller can append immutable command lifecycle timestamps", () => {
+  const rules = json("firebase/database.rules.json") as { rules: Record<string, Record<string, unknown>> };
+  const farm = rules.rules.farms as Record<string, Record<string, unknown>>;
+  const stand = (farm.$farmId.stands as Record<string, Record<string, unknown>>).$standId;
+  const command = (stand.commands as Record<string, Record<string, unknown>>).$commandId;
+  for (const timestamp of ["received_at", "started_at", "completed_at"]) {
+    const write = String((command[timestamp] as Record<string, unknown>)[".write"]);
+    assert.match(write, /child\('enabled'\)\.val\(\) === true/);
+    assert.match(write, /!data\.exists\(\)/);
+    assert.match(write, /newData\.isNumber\(\)/);
+  }
+});
+
+test("controller command-transition audit events are append-only and registry-bound", () => {
+  const rules = json("firebase/database.rules.json") as { rules: Record<string, Record<string, unknown>> };
+  const audit = ((rules.rules.system as Record<string, Record<string, unknown>>).audit as Record<string, Record<string, unknown>>).$eventId;
+  const write = String(audit[".write"]);
+  assert.match(write, /!data\.exists\(\)/);
+  assert.match(write, /child\('enabled'\)\.val\(\) === true/);
+  assert.match(write, /COMMAND_STATUS/);
+  assert.match(write, /child\('farm_id'\)\.val\(\) === root\.child\('deviceRegistry'\)/);
 });
 
 test("only an enabled controller can create immutable system alerts", () => {

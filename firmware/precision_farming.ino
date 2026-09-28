@@ -80,6 +80,11 @@ void writeCommandFailureAlert(const String&id,const char*code,const char*message
   alert.set("alert_id",alertId);alert.set("type",code);alert.set("severity",!strcmp(code,"COMMAND_EXPIRED")?"WARNING":"CRITICAL");alert.set("message",message);alert.set("created_at",(double)nowMs());alert.set("updated_at",(double)nowMs());alert.set("resolved",false);
   Firebase.RTDB.setJSON(&fbdo,standPath()+"/alerts/"+alertId,&alert);
 }
+void writeCommandAudit(const String&commandId,const String&operationId,const char*status,const char*error){
+  uint64_t at=nowMs();FirebaseJson audit;String eventId="AUDIT_"+commandId+"_"+String(status)+"_"+String(at);
+  audit.set("action","COMMAND_STATUS");audit.set("command_id",commandId);audit.set("operation_id",operationId);audit.set("status",status);audit.set("farm_id",FARM_ID);audit.set("stand_id",STAND_ID);audit.set("at",(double)at);if(error)audit.set("error_code",error);
+  Firebase.RTDB.setJSON(&fbdo,"/system/audit/"+eventId,&audit);
+}
 void setCommandStatus(const String&id,const char*status,const char*error=nullptr){
   String p=commandPath(id);Firebase.RTDB.setString(&fbdo,p+"/status",status);
   if(!strcmp(status,"RECEIVED"))Firebase.RTDB.setDouble(&fbdo,p+"/received_at",nowMs());
@@ -90,9 +95,10 @@ void setCommandStatus(const String&id,const char*status,const char*error=nullptr
   // The dashboard follows the authoritative operation record; the controller may
   // only update execution fields, never create or rewrite the operation payload.
   if(Firebase.RTDB.getString(&fbdo,p+"/operation_id")){
-    String operationPath=standPath()+"/operations/"+fbdo.stringData();
+    String operationId=fbdo.stringData();String operationPath=standPath()+"/operations/"+operationId;
     Firebase.RTDB.setString(&fbdo,operationPath+"/status",status);
     if(error){Firebase.RTDB.setString(&fbdo,operationPath+"/error_code",error);Firebase.RTDB.setString(&fbdo,operationPath+"/error_message",errorMessage);}
+    writeCommandAudit(id,operationId,status,error);
   }
 }
 void processCommands(){

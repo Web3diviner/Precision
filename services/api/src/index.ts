@@ -16,7 +16,16 @@ const app = express();
 const allowedOrigins = (process.env.FRONTEND_ORIGIN ?? "").split(",").map(origin => origin.trim()).filter(Boolean);
 app.use(cors({ origin: allowedOrigins.length ? allowedOrigins : false, methods: ["GET", "POST"], allowedHeaders: ["Authorization", "Content-Type", "X-Firebase-AppCheck"], maxAge: 86_400 }));
 app.use(express.json({ limit: "32kb" }));
-app.use((_req, res, next) => { res.setHeader("Cache-Control", "no-store"); next(); });
+app.use((req, res, next) => {
+  const startedAt = Date.now();
+  const suppliedId = req.header("x-request-id");
+  const requestId = suppliedId && /^[A-Za-z0-9_-]{8,100}$/.test(suppliedId) ? suppliedId : crypto.randomUUID();
+  res.locals.requestId = requestId;
+  res.setHeader("X-Request-Id", requestId);
+  res.setHeader("Cache-Control", "no-store");
+  res.on("finish", () => console.info(JSON.stringify({ event: "api_request", request_id: requestId, method: req.method, path: req.path, status: res.statusCode, latency_ms: Date.now() - startedAt, uid: res.locals.user?.uid })));
+  next();
+});
 
 const requireUser: RequestHandler = async (req, res, next) => {
   try { const token = req.header("authorization")?.replace(/^Bearer\s+/i, ""); if (!token) return res.status(401).json({ error: "AUTH_REQUIRED" }); res.locals.user = await auth.verifyIdToken(token); next(); }
@@ -44,6 +53,7 @@ type UserProfile = { role?: string; farm_ids?: Record<string, boolean> };
 async function profile(uid: string) { return (await db.ref(`users/${uid}`).get()).val() as UserProfile | null; }
 async function canRead(uid: string, farmId: string) { return Boolean((await profile(uid))?.farm_ids?.[farmId]); }
 async function canOperate(uid: string, farmId: string) { const user = await profile(uid); return Boolean(user?.farm_ids?.[farmId]) && ["admin", "farm_manager"].includes(user?.role ?? ""); }
+const standSummary = (stand: { metadata?: unknown; controller?: unknown } | null) => ({ metadata: stand?.metadata ?? null, controller: stand?.controller ?? null });
 
 const id = (prefix: string) => `${prefix}_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
 type CommandKind = "IRRIGATE" | "FERTIGATE";
@@ -94,6 +104,7 @@ async function createCommand(req: express.Request, res: express.Response, kind: 
     const createdAt = Date.now(); const operationId = id("OP"); const commandId = id("CMD"); const source = "web_api";
     const command = { command_id: commandId, operation_id: operationId, type: kind, farm_id: input.farmId, stand_id: input.standId, target_nodes: input.targetNodes, water_liters: input.waterLiters, ...(kind === "FERTIGATE" ? { dosing_ml: (input as typeof input & { dosingMl: { nitrogen: number; phosphorus: number; potassium: number } }).dosingMl } : {}), status: "PENDING", requested_by: uid, source, created_at: createdAt, expires_at: createdAt + positiveNumberEnv("COMMAND_EXPIRY_SECONDS", 120) * 1000 };
     await db.ref().update({ [`${standPath}/operations/${operationId}`]: command, [`${standPath}/commands/${commandId}`]: command, [`system/audit/${operationId}`]: { action: "COMMAND_CREATED", actor: uid, source, at: createdAt, farm_id: input.farmId, stand_id: input.standId } });
+    console.info(JSON.stringify({ event: "command_created", request_id: res.locals.requestId, uid, operation_id: operationId, command_id: commandId, type: kind, farm_id: input.farmId, stand_id: input.standId, target_nodes: input.targetNodes }));
     return res.status(201).json({ operationId, commandId, status: "PENDING" });
   } finally {
     await releaseCommandLock(input.farmId, input.standId, lockId).catch(error => console.error(JSON.stringify({ event: "command_lock_release_failed", lock_id: lockId, error: error instanceof Error ? error.message : "UNKNOWN" })));
@@ -102,8 +113,8 @@ async function createCommand(req: express.Request, res: express.Response, kind: 
 
 app.get("/health", (_req, res) => res.json({ ok: true, service: "precision-api" }));
 app.get("/api/farms", requireUser, async (_req, res) => { const user = await profile(res.locals.user.uid); const farmIds = Object.entries(user?.farm_ids ?? {}).filter(([, allowed]) => allowed).map(([farmId]) => farmId); const records = await Promise.all(farmIds.map(async id => ({ id, metadata: (await db.ref(`farms/${id}/metadata`).get()).val() }))); res.json(records); });
-app.get("/api/farms/:farmId/stands", requireUser, async (req, res) => { const farmId = String(req.params.farmId); if (!await canRead(res.locals.user.uid, farmId)) return res.status(403).json({ error: "FORBIDDEN" }); const stands = (await db.ref(`farms/${farmId}/stands`).get()).val() ?? {}; res.json(stands); });
-app.get("/api/farms/:farmId/stands/:standId", requireUser, async (req, res) => { const farmId = String(req.params.farmId); if (!await canRead(res.locals.user.uid, farmId)) return res.status(403).json({ error: "FORBIDDEN" }); const stand = (await db.ref(`farms/${farmId}/stands/${String(req.params.standId)}`).get()).val(); return stand ? res.json(stand) : res.status(404).json({ error: "NOT_FOUND" }); });
+app.get("/api/farms/:farmId/stands", requireUser, async (req, res) => { const farmId = String(req.params.farmId); if (!await canRead(res.locals.user.uid, farmId)) return res.status(403).json({ error: "FORBIDDEN" }); const stands = ((await db.ref(`farms/${farmId}/stands`).get()).val() ?? {}) as Record<string, { metadata?: unknown; controller?: unknown }>; res.json(Object.fromEntries(Object.entries(stands).map(([standId, stand]) => [standId, standSummary(stand)]))); });
+app.get("/api/farms/:farmId/stands/:standId", requireUser, async (req, res) => { const farmId = String(req.params.farmId); if (!await canRead(res.locals.user.uid, farmId)) return res.status(403).json({ error: "FORBIDDEN" }); const stand = (await db.ref(`farms/${farmId}/stands/${String(req.params.standId)}`).get()).val() as { metadata?: unknown; controller?: unknown } | null; return stand ? res.json(standSummary(stand)) : res.status(404).json({ error: "NOT_FOUND" }); });
 app.get("/api/farms/:farmId/stands/:standId/nodes", requireUser, async (req, res) => { const farmId = String(req.params.farmId); if (!await canRead(res.locals.user.uid, farmId)) return res.status(403).json({ error: "FORBIDDEN" }); res.json((await db.ref(`farms/${farmId}/stands/${String(req.params.standId)}/nodes`).get()).val() ?? {}); });
 app.get("/api/farms/:farmId/alerts", requireUser, async (req, res) => { const farmId = String(req.params.farmId); if (!await canRead(res.locals.user.uid, farmId)) return res.status(403).json({ error: "FORBIDDEN" }); res.json((await db.ref(`farms/${farmId}/alerts`).get()).val() ?? {}); });
 app.post("/api/farms/:farmId/alerts/:alertId/acknowledge", requireUser, requireAppCheck, async (req, res) => {
@@ -120,7 +131,7 @@ app.get("/api/farms/:farmId/stands/:standId/operations/:operationId", requireUse
 app.post("/api/commands/irrigate", requireUser, requireAppCheck, commandRateLimit, async (req, res) => createCommand(req, res, "IRRIGATE"));
 app.post("/api/commands/fertigate", requireUser, requireAppCheck, commandRateLimit, async (req, res) => createCommand(req, res, "FERTIGATE"));
 app.use((error: unknown, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
-  console.error(JSON.stringify({ event: "api_request_failed", error: error instanceof Error ? error.message : "UNKNOWN" }));
+  console.error(JSON.stringify({ event: "api_request_failed", request_id: res.locals.requestId, error: error instanceof Error ? error.message : "UNKNOWN" }));
   if (!res.headersSent) res.status(500).json({ error: "INTERNAL_ERROR" });
 });
 app.listen(Number(process.env.PORT ?? 4000), () => console.info(JSON.stringify({ event: "api_started" })));

@@ -5,7 +5,7 @@ services:
     buildCommand: npm ci && npm run build --workspace=@precision/api
     startCommand: node services/api/dist/index.js
     healthCheckPath: /health
-    autoDeploy: false
+    autoDeploy: true
     envVars:
       - key: NODE_VERSION
         value: "22"
