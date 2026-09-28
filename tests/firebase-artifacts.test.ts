@@ -28,6 +28,14 @@ test("local web API fallbacks match the API service port", () => {
   assert.match(operationForm, /http:\/\/localhost:4000/);
 });
 
+test("the lockfile does not require a Windows-only Next compiler on Linux deploys", () => {
+  const lock = json("package-lock.json") as { packages: Record<string, { devDependencies?: Record<string, string>; optional?: boolean; os?: string[] }> };
+  assert.equal(lock.packages[""]?.devDependencies?.["@next/swc-win32-x64-msvc"], undefined);
+  const compiler = lock.packages["node_modules/@next/swc-win32-x64-msvc"];
+  assert.equal(compiler?.optional, true);
+  assert.deepEqual(compiler?.os, ["win32"]);
+});
+
 test("development seed contains one offline six-node stand with unique Modbus addresses", () => {
   const seed = json("firebase/seed/development-farm.json") as { farms: Record<string, { stands: Record<string, { controller: { online?: boolean }; nodes: Record<string, { metadata?: { enabled?: boolean; modbus_address?: number } }> }> }> };
   const stand = seed.farms.FARM_001.stands.STAND_01;

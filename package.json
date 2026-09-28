@@ -16,7 +16,6 @@
   },
   "devDependencies": {
     "@firebase/rules-unit-testing": "^5.0.2",
-    "@next/swc-win32-x64-msvc": "^16.3.6",
     "firebase-tools": "^15.31.0"
   }
 }
