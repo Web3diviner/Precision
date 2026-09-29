@@ -10,6 +10,7 @@
   "scripts": {
     "dev:web": "npm run dev --workspace=@precision/web",
     "dev:api": "npm run dev --workspace=@precision/api",
+    "seed:development": "tsx scripts/seed-development.ts",
     "build": "npm run build --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "tsx --test packages/contracts/src/index.test.ts tests/firebase-artifacts.test.ts"

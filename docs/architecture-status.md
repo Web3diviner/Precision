@@ -9,6 +9,8 @@
 - Next.js dashboard foundation and direct Firebase Realtime Database subscription.
 - A route-level dashboard recovery boundary prevents unexpected client rendering failures from leaving operators on a blank page and makes clear that no operation was created.
 - The authenticated dashboard selects from the operator's authorized Farms and their API-authorized Stands rather than assuming a fixed `FARM_001` / `STAND_01` deployment.
+- The development topology now includes two Farms with two named Stands each; every Stand owns its own offline controller record and independent six-Node Modbus address space.
+- A safe Firebase Admin provisioning command expands development capacity to 10 Farms × 10 Stands × 6 Nodes, only creating missing Farm/Stand records so it cannot reset provisioned controllers or telemetry.
 - Farm/Stand discovery API responses are minimized to metadata and controller summaries; controller-only command queues and operation payloads are never returned for selector use.
 - Node history supports indexed 1-hour, 24-hour, 7-day, 30-day, and bounded custom date ranges, with an accessible moisture trend visualization when valid data is available.
 - Express/Firebase Admin command API with token verification, role checks, online/staleness checks, stand-level conflict protection, expiry and audit writes.

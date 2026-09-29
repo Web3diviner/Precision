@@ -45,11 +45,20 @@ npm run build
 
 1. Create a Firebase project and enable Email/Password Authentication.
 2. Create the browser app, then configure the `NEXT_PUBLIC_FIREBASE_*` values in `apps/web/.env.local` and Vercel.
-3. Seed a development-only database from `firebase/seed/development-farm.json`; it defines `FARM_001`, `STAND_01`, and six Nodes.
+3. Seed a development-only database from `firebase/seed/development-farm.json`; it defines two Farms (`FARM_001`, `FARM_002`), each with `STAND_01` and `STAND_02`, and six Nodes per Stand.
+
+   To provision the full development capacity of 10 Farms × 10 Stands × 6 Nodes without overwriting existing Stands, first inspect the plan and then run:
+
+   ```bash
+   npm run seed:development -- --dry-run
+   npm run seed:development
+   ```
+
+   The provisioning command uses the same Firebase Admin environment variables as the API and creates only missing Farm metadata and Stand records.
 4. Create `/users/{uid}` with a supported role and Farm grant, for example:
 
 ```json
-{"role":"admin","farm_ids":{"FARM_001":true}}
+{"role":"admin","farm_ids":{"FARM_001":true,"FARM_002":true}}
 ```
 
 5. Register each controller independently at `/deviceRegistry/{controllerUid}` with `enabled`, `farm_id`, and `stand_id`.

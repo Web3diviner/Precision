@@ -36,15 +36,20 @@ test("the lockfile does not require a Windows-only Next compiler on Linux deploy
   assert.deepEqual(compiler?.os, ["win32"]);
 });
 
-test("development seed contains one offline six-node stand with unique Modbus addresses", () => {
+test("development seed contains multiple Farms with independent offline six-node Stands", () => {
   const seed = json("firebase/seed/development-farm.json") as { farms: Record<string, { stands: Record<string, { controller: { online?: boolean }; nodes: Record<string, { metadata?: { enabled?: boolean; modbus_address?: number } }> }> }> };
-  const stand = seed.farms.FARM_001.stands.STAND_01;
-  assert.equal(stand.controller.online, false);
-  const nodeIds = Object.keys(stand.nodes).sort();
-  assert.deepEqual(nodeIds, ["NODE_01", "NODE_02", "NODE_03", "NODE_04", "NODE_05", "NODE_06"]);
-  const addresses = nodeIds.map((nodeId) => stand.nodes[nodeId].metadata?.modbus_address).sort((a, b) => (a ?? 0) - (b ?? 0));
-  assert.deepEqual(addresses, [1, 2, 3, 4, 5, 6]);
-  assert.ok(nodeIds.every((nodeId) => stand.nodes[nodeId].metadata?.enabled === true));
+  assert.deepEqual(Object.keys(seed.farms).sort(), ["FARM_001", "FARM_002"]);
+  for (const farm of Object.values(seed.farms)) {
+    assert.deepEqual(Object.keys(farm.stands).sort(), ["STAND_01", "STAND_02"]);
+    for (const stand of Object.values(farm.stands)) {
+      assert.equal(stand.controller.online, false);
+      const nodeIds = Object.keys(stand.nodes).sort();
+      assert.deepEqual(nodeIds, ["NODE_01", "NODE_02", "NODE_03", "NODE_04", "NODE_05", "NODE_06"]);
+      const addresses = nodeIds.map((nodeId) => stand.nodes[nodeId].metadata?.modbus_address).sort((a, b) => (a ?? 0) - (b ?? 0));
+      assert.deepEqual(addresses, [1, 2, 3, 4, 5, 6]);
+      assert.ok(nodeIds.every((nodeId) => stand.nodes[nodeId].metadata?.enabled === true));
+    }
+  }
 });
 
 test("active controller write paths require an enabled device registry entry", () => {
